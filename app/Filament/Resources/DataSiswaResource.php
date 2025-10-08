@@ -4,20 +4,27 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\DataSiswaResource\Pages;
 use App\Filament\Resources\DataSiswaResource\RelationManagers;
+use App\Models\data_kelas;
 use App\Models\data_siswa;
 use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Section;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Hash;
+use Filament\Notifications\Notification;
+use Filament\Tables\Actions\BulkAction;
+use Filament\Tables\Columns\TextColumn;
 
 class DataSiswaResource extends Resource
 {
@@ -31,6 +38,12 @@ class DataSiswaResource extends Resource
 
     protected static ?string $pluralLabel = 'Data Siswa';
 
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->with(['kelas.walikelas', 'user']);
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -42,12 +55,21 @@ class DataSiswaResource extends Resource
                             ->hidden(),
                         TextInput::make('account.username')
                             ->label('Username')
-                            ->required()
-                            ->unique('users', 'username', ignoreRecord:true)
+                            ->required()                            
                             ->maxLength(255)
                             ->helperText('Otomatis terisi dari NISN')
                             ->disabled(fn ($context) => $context === 'create')
-                            ->dehydrated(true),
+                            ->dehydrated(true)
+                             ->unique(
+                                table: 'users',
+                                column: 'username',
+                                modifyRuleUsing: function ($rule, $record) {
+                                    if ($record && $record->user) {
+                                        return $rule->ignore($record->user->id);
+                                    }
+                                    return $rule;
+                                }
+                            ),
                         TextInput::make('account.name')
                             ->label('Nama')
                             ->required()
@@ -147,10 +169,10 @@ class DataSiswaResource extends Resource
                                 'Konghucu' => 'Konghucu',
                             ]),
                         
-                        TextInput::make('alamat')
+                        Textarea::make('alamat')
                             ->label('Alamat Lengkap')
                             ->required()
-                            ->columnSpanFull(),
+                            
                     ])
                     ->columns(2),
 
@@ -181,7 +203,7 @@ class DataSiswaResource extends Resource
                             ->required(),
                         
                         TextInput::make('pekerjaan_ibu')
-                            ->label('Pekerjaan Ibu')
+                              ->label('Pekerjaan Ibu')
                             ->required(),
                         
                         TextInput::make('no_telp_ortu_wali')
@@ -217,13 +239,31 @@ class DataSiswaResource extends Resource
                         
                         Select::make('kelas')
                             ->label('Kelas Saat Ini')
-                            ->required()
-                            ->options([
-                                'A' => 'A',
-                                'B' => 'B',
-                            ]),
+                            ->placeholder('-- Pilih Kelas --')
+                            ->options(function () {
+                                return data_kelas::query()
+                                    ->with(['walikelas', 'tahunAjaran'])
+                                    ->orderBy('tingkat')
+                                    ->orderBy('nama_kelas')
+                                    ->get()
+                                    ->mapWithKeys(function ($kelas) {
+                                        $waliKelas = $kelas->walikelas 
+                                            ? ' - Wali: ' . $kelas->walikelas->nama_lengkap 
+                                            : '';
+                                        $tahun = $kelas->tahunAjaran 
+                                            ? ' (' . $kelas->tahunAjaran->year . ')' 
+                                            : '';
+                                        
+                                        return [
+                                            $kelas->id => $kelas->nama_kelas . ' [Tingkat ' . $kelas->tingkat . ']' . $waliKelas . $tahun
+                                        ];
+                                    });
+                            })
+                            ->searchable()
+                            ->preload()
+                            ->nullable(),
                         
-                        Forms\Components\Hidden::make('status')
+                        Hidden::make('status')
                             ->default('Aktif')
                             ->dehydrated(true)
                             ->visible(fn($livewire) => $livewire instanceof \Filament\Resources\Pages\CreateRecord),
@@ -271,10 +311,21 @@ class DataSiswaResource extends Resource
                     ->sortable()
                     ->formatStateUsing(fn($state) => $state === 'Laki-laki' ? 'L' : 'P'),
                 
-                Tables\Columns\TextColumn::make('kelas')
+                TextColumn::make('kelas.nama_kelas')
                     ->label('Kelas')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->default('-')
+                    ->badge()
+                    ->color('success')
+                    ->description(function ($record) {
+                        try {
+                            $walikelas = $record->getWaliKelasInfo();
+                            return $walikelas ? 'Wali: ' . $walikelas->nama_lengkap : null;
+                        } catch (\Exception $e) {
+                            return null;
+                        }
+                    }),
                 
                 Tables\Columns\BadgeColumn::make('status')
                     ->label('Status')
@@ -290,21 +341,21 @@ class DataSiswaResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('kelas')
+                SelectFilter::make('kelas')
                     ->label('Kelas')
-                    ->options([
-                        'A' => 'A',
-                        'B' => 'B',
-                    ]),
-                
-                Tables\Filters\SelectFilter::make('status')
+                    ->relationship('kelas', 'nama_kelas')
+                    ->searchable()
+                    ->preload()
+                    ->multiple(),
+
+                SelectFilter::make('status')
                     ->label('Status')
                     ->options([
                         'Aktif' => 'Aktif',
                         'Non_Aktif' => 'Non Aktif',
                     ]),
                 
-                Tables\Filters\SelectFilter::make('jenis_kelamin')
+                SelectFilter::make('jenis_kelamin')
                     ->label('Jenis Kelamin')
                     ->options([
                         'Laki-laki' => 'Laki-laki',
@@ -319,6 +370,45 @@ class DataSiswaResource extends Resource
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
+                    //pindah kelas
+                    BulkAction::make('pindahKelas')
+                        ->label('Pindah Kelas')
+                        ->icon('heroicon-o-arrow-right-circle')
+                        ->color('info')
+                        ->form([
+                            Select::make('kelas')
+                                ->label('Pilih Kelas Baru')
+                                ->placeholder('-- Pilih Kelas Tujuan --')
+                                ->options(function () {
+                                    return data_kelas::query()
+                                        ->orderBy('tingkat')
+                                        ->orderBy('nama_kelas')
+                                        ->get()
+                                        ->mapWithKeys(function ($kelas) {
+                                            $waliKelas = $kelas->walikelas 
+                                                ? ' - ' . $kelas->walikelas->nama_lengkap 
+                                                : '';
+                                            return [
+                                                $kelas->id => $kelas->nama_kelas . ' [Tingkat ' . $kelas->tingkat . ']' . $waliKelas
+                                            ];
+                                        });
+                                })
+                                ->required()
+                                ->searchable()
+                        ])
+                        ->action(function (array $data, $records) {
+                            $records->each->update(['kelas' => $data['kelas']]);
+                        })
+                        ->deselectRecordsAfterCompletion()
+                        ->successNotificationTitle('Siswa berhasil dipindahkan ke kelas baru'),
+
+                        //aktif non aktif
+                        BulkAction::make('aktifkan')
+                        ->label('Aktifkan')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->action(fn ($records) => $records->each->update(['status' => 'Aktif']))
+                        ->deselectRecordsAfterCompletion(),
                 ]),
             ])
             ->defaultSort('created_at', 'desc');
@@ -336,7 +426,12 @@ class DataSiswaResource extends Resource
         return [
             'index' => Pages\ListDataSiswas::route('/'),
             'create' => Pages\CreateDataSiswa::route('/create'),
-            'edit' => Pages\EditDataSiswa::route('/{record}/edit') 
+            'edit' => Pages\EditDataSiswa::route('/{record}/edit')
         ];
+    }
+
+    public static function canViewAny(): bool
+    {
+        return auth()->user()->can('can view admin');
     }
 }

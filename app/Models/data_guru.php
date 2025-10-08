@@ -12,6 +12,8 @@ class data_guru extends Model
     protected $table = 'data_guru';
     protected $guarded = []; // otomatis semua field boleh mass-assign
 
+     protected $primaryKey = 'id';
+
     protected $fillable = [
         'user_id',
         'nama_lengkap',
@@ -30,5 +32,11 @@ class data_guru extends Model
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    // Relationship sebagai wali kelas
+    public function kelasWali()
+    {
+        return $this->hasMany(data_kelas::class, 'walikelas_id');
     }
 }

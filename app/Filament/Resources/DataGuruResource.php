@@ -53,7 +53,7 @@ class DataGuruResource extends Resource
                         ->maxLength(255),
 
                     TextInput::make('account.name')
-                        ->hidden()
+                        ->hidden(fn ($context) => $context === 'create')
                         ->label('Nama (Akun)')
                         ->required()
                         ->maxLength(255)
@@ -172,6 +172,6 @@ class DataGuruResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return auth()->user()->can('view data guru');
+        return auth()->user()->can('can view admin');
     }
 }

@@ -9,23 +9,21 @@ use Illuminate\Testing\Fluent\Concerns\Has;
 use App\Filament\Pages\Traits\HasBackButton;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Filament\Notifications\Notification;
 
 class CreateDataSiswa extends CreateRecord
 {
     protected static ?string $title = 'Tambah Data Siswa';
+    protected static string $resource = DataSiswaResource::class;
 
     use HasBackButton;
-
-    protected static string $resource = DataSiswaResource::class;
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-
         // Ambil data account dari form
         $username = $data['account']['username'] ?? $data['nisn'];
         $password = $data['account']['password'] ?? $data['nisn'];
         $name = $data['account']['name'] ?? $data['nama_lengkap'];
 
-        
         // Buat user baru
         $user = User::create([
             'username' => $username,
@@ -42,5 +40,19 @@ class CreateDataSiswa extends CreateRecord
         unset($data['account']);
 
         return $data;
+    }
+
+    protected function getCreatedNotification(): ?Notification
+    {
+        return Notification::make()
+            ->success()
+            ->title('Data Siswa Berhasil Ditambahkan!')
+            ->body('Data siswa baru telah berhasil disimpan ke dalam sistem.')
+            ->duration(5000);
+    }
+
+     protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
     }
 }
