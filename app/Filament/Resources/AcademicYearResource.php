@@ -94,4 +94,8 @@ class AcademicYearResource extends Resource
             'edit' => Pages\EditAcademicYear::route('/{record}/edit'),
         ];
     }
+    public static function canViewAny(): bool
+    {
+        return auth()->user()->can('view data admin');
+    }
 }

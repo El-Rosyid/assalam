@@ -140,7 +140,6 @@ class DataKelasResource extends Resource
 
                 TextColumn::make('tahunAjaran.year')
                     ->label('Tahun Ajaran')
-                    ->sortable()
                     ->default('-')
                     ->description(fn ($record) => $record->tahunAjaran?->semester),
                 ])
@@ -411,7 +410,8 @@ class DataKelasResource extends Resource
                                 $namaKelas[] = $kelas->nama_kelas;
                             }
 
-                            $namaTahunAjaran = academic_year::find($tahunAjaranBaru)->year;
+                            $tahunAjaranObj = academic_year::find($tahunAjaranBaru);
+                            $namaTahunAjaran = $tahunAjaranObj->year;
 
                             Notification::make()
                                 ->success()
@@ -442,5 +442,9 @@ class DataKelasResource extends Resource
             'create' => Pages\CreateDataKelas::route('/create'),
             'edit' => Pages\EditDataKelas::route('/{record}/edit'),
         ];
+    }
+    public static function canViewAny(): bool
+    {
+        return auth()->user()->can('view data admin');
     }
 }

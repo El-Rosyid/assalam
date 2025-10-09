@@ -13,10 +13,13 @@ class academic_year extends Model
     public $timestamps = false;
 
     protected $fillable = [
-        'tahun_mulai',
-        'tahun_selesai',
+        'year',
         'semester',
-        'is_active'
+        'pembagian_raport'
+    ];
+
+    protected $casts = [
+        'pembagian_raport' => 'date'
     ];
 
     // Relationship ke kelas
@@ -28,6 +31,12 @@ class academic_year extends Model
     // Accessor untuk nama tahun ajaran
     public function getNamaTahunAjaranAttribute()
     {
-        return $this->tahun_mulai . '/' . $this->tahun_selesai . ' - ' . ucfirst($this->semester);
+        return $this->year . ' - ' . ucfirst($this->semester);
+    }
+
+    // Accessor untuk format tahun saja (alias untuk konsistensi)
+    public function getTahunAttribute()
+    {
+        return $this->year;
     }
 }

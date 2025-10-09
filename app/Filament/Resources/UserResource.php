@@ -12,6 +12,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Hash;
 
 class UserResource extends Resource
 {
@@ -35,7 +36,7 @@ class UserResource extends Resource
                     ->required(fn (string $context): bool => $context === 'create')
                     ->maxLength(255)
                     ->dehydrated(fn (string $context): bool => $context === 'create')
-                    ->dehydrateStateUsing(fn ($state) => \Hash::make($state)),
+                    ->dehydrateStateUsing(fn ($state) => Hash::make($state)),
                 Forms\Components\Select::make('roles')
                     ->multiple()
                     ->relationship('roles', 'name')
@@ -78,5 +79,9 @@ class UserResource extends Resource
             'create' => Pages\CreateUser::route('/create'),
             'edit' => Pages\EditUser::route('/{record}/edit'),
         ];
+    }
+    public static function canViewAny(): bool
+    {
+        return auth()->user()->can('view data admin');
     }
 }

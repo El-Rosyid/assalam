@@ -16,4 +16,9 @@ class ListPermissions extends ListRecords
             Actions\CreateAction::make(),
         ];
     }
+    
+    public static function canViewAny(): bool
+    {
+        return auth()->user()->can('view data admin');
+    }
 }

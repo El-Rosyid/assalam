@@ -118,9 +118,9 @@ class SekolahResource extends Resource
     }
 
 
-    // Commented out karena Spatie Permission belum diinstall
-    // public static function canViewAny(): bool
-    // {
-    //     return auth()->user()->can('can access sekolah');
-    // }
+    public static function canViewAny(): bool
+    {
+        return auth()->user()->can('view data admin');
+    }
+
 }
