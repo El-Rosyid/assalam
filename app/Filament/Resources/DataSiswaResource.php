@@ -432,6 +432,6 @@ class DataSiswaResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return auth()->user()->can('can view admin');
+        return auth()->user()->can('view data admin');
     }
 }

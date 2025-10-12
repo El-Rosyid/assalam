@@ -27,7 +27,7 @@ class UserResource extends Resource
                 Forms\Components\TextInput::make('name')
                     ->required()
                     ->maxLength(255),
-                Forms\Components\TextInput::make('email')
+                Forms\Components\TextInput::make('username')
                     ->email()
                     ->required()
                     ->maxLength(255),
@@ -49,7 +49,7 @@ class UserResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('name')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('email')->sortable()->searchable(),
+                Tables\Columns\TextColumn::make('username')->sortable()->searchable(),
                 Tables\Columns\TagsColumn::make('roles.name'),
             ])
             ->filters([
