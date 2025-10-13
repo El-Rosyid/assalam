@@ -12,6 +12,6 @@ class assessment_variable extends Model
     protected $guarded = [];
     protected $fillable = [
         'name',
-        'deskripsi'
+        'dekripsi'
     ];
 }

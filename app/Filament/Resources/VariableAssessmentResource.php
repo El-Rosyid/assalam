@@ -37,7 +37,7 @@ class VariableAssessmentResource extends Resource
                             ->required()
                             ->maxLength(255),
                         
-                        Forms\Components\Textarea::make('deskripsi')
+                        Forms\Components\Textarea::make('dekripsi')
                             ->label('Deskripsi')
                             ->rows(3)
                             ->maxLength(1000),

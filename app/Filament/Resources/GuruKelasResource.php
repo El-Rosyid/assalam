@@ -63,7 +63,7 @@ class GuruKelasResource extends Resource
                     ->label('Jumlah Siswa')
                     ->counts('siswa')
                     ->badge(),
-                TextColumn::make('walikelas.nama')
+                TextColumn::make('walikelas.nama_lengkap')
                     ->label('Wali Kelas')
                     ->default('Tidak Ada'),
             ])
@@ -143,6 +143,8 @@ class GuruKelasResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return auth()->user()->can('view data guru');
+        // Only wali kelas can access
+        $user = auth()->user();
+        return $user && $user->guru;
     }
 }

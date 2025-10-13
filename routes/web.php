@@ -41,3 +41,15 @@ Route::get('/guru', function () {
 Route::get('/kelas', function () {
     return view('kelas');
 });
+
+// Report Card Routes
+Route::middleware('auth')->group(function () {
+    Route::get('/download/raport/{siswa}', [App\Http\Controllers\ReportCardController::class, 'downloadRaport'])
+        ->name('download.raport');
+    Route::get('/preview/raport/{siswa}', [App\Http\Controllers\ReportCardController::class, 'previewRaport'])
+        ->name('preview.raport');
+    Route::get('/print/raport/{siswa}', [App\Http\Controllers\ReportCardController::class, 'printRaport'])
+        ->name('print.raport');
+});
+
+
