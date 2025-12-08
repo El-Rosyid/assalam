@@ -9,7 +9,7 @@
  */
 
 // Prevent direct access from other domains
-$allowedHosts = ['localhost', 'sekolah.test', 'yourdomain.com', 'www.yourdomain.com'];
+$allowedHosts = ['localhost', 'sekolah.test', 'abaassalam.my.id', 'www.abaassalam.my.id'];
 if (!in_array($_SERVER['HTTP_HOST'], $allowedHosts)) {
     die('Access denied');
 }

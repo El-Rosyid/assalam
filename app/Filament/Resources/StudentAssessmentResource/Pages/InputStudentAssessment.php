@@ -125,14 +125,14 @@ class InputStudentAssessment extends EditRecord
                                                 ->label("Tingkat Perkembangan")
                                                 ->options([
                                                     'Berkembang Sesuai Harapan' => '✅ Berkembang Sesuai Harapan',
-                                                    'Sudah Berkembang' => '🟢 Sudah Berkembang',
-                                                    'Mulai Berkembang' => '🟡 Mulai Berkembang',
                                                     'Belum Berkembang' => '🔴 Belum Berkembang',
+                                                    'Mulai Berkembang' => '🟡 Mulai Berkembang',
+                                                    'Sudah Berkembang' => '🟢 Sudah Berkembang',
                                                 ])
                                                 ->reactive()
                                                 ->afterStateUpdated(function (Forms\Set $set, $state) use ($variable) {
                                                     if ($state) {
-                                                        $autoDescription = student_assessment_detail::getAutoDescription($state);
+                                                        $autoDescription = student_assessment_detail::getAutoDescription($state, $variable->id);
                                                         $set("details.{$variable->id}.description", $autoDescription);
                                                     }
                                                 })

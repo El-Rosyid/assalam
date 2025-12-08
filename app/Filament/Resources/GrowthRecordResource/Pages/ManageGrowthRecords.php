@@ -97,7 +97,8 @@ class ManageGrowthRecords extends Page implements HasTable
 
                 TextColumn::make('siswa_nama')
                     ->label('Nama Siswa')
-                    ->searchable(['data_siswa.nama_lengkap']),
+                    ->searchable(['data_siswa.nama_lengkap'])
+                    ->sortable(),
 
                 TextColumn::make('siswa_nis')
                     ->label('NIS')
