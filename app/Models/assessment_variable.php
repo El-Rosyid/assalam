@@ -12,6 +12,11 @@ class assessment_variable extends Model
     protected $guarded = [];
     protected $fillable = [
         'name',
-        'dekripsi'
+        'deskripsi'
     ];
+    
+    public function ratingDescriptions()
+    {
+        return $this->hasMany(AssessmentRatingDescription::class, 'assessment_variable_id');
+    }
 }

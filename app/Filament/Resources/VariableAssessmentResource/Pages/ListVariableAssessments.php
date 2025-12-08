@@ -14,7 +14,9 @@ class ListVariableAssessments extends ListRecords
     {
         return [
             Actions\CreateAction::make()
-                ->modalHeading('Tambah Assessment Variable')
+                ->modalHeading('Tambah Penilaian')
+                ->label('Tambah Penilaian')
+                ->icon('heroicon-o-plus')
                 ->modalWidth('md'),
         ];
     }

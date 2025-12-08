@@ -41,11 +41,11 @@ class ReportCardResource extends Resource
                 $user = auth()->user();
                 if ($user && $user->guru) {
                     // If user is kepala sekolah, show all classes
-                    $isKepalaSekolah = \App\Models\sekolah::where('kepala_sekolah', $user->guru->id)->exists();
+                    $isKepalaSekolah = \App\Models\Sekolah::where('kepala_sekolah', $user->guru->guru_id)->exists();
                     
                     if (!$isKepalaSekolah) {
                         // If not kepala sekolah, only show classes where user is wali kelas
-                        $query->where('walikelas_id', $user->guru->id);
+                        $query->where('walikelas_id', $user->guru->guru_id);
                     }
                 }
                 return $query;
@@ -68,7 +68,7 @@ class ReportCardResource extends Resource
                 Tables\Columns\TextColumn::make('siswa_count')
                     ->label('Jumlah Siswa')
                     ->getStateUsing(function (data_kelas $record) {
-                        $count = data_siswa::where('kelas', $record->id)->count();
+                        $count = data_siswa::where('kelas', $record->kelas_id)->count();
                         return $count . ' siswa';
                     }),
             ])
@@ -80,7 +80,7 @@ class ReportCardResource extends Resource
                     ->label('Detail')
                     ->icon('heroicon-o-eye')
                     ->color('primary')
-                    ->url(fn (data_kelas $record): string => route('filament.admin.resources.report-cards.students', ['record' => $record->id]))
+                    ->url(fn (data_kelas $record): string => route('filament.admin.resources.report-cards.students', ['record' => $record->kelas_id]))
             ])
             ->bulkActions([
                 // No bulk actions needed
@@ -100,7 +100,7 @@ class ReportCardResource extends Resource
     {
         return [
             'index' => Pages\ListReportCards::route('/'),
-            'students' => Pages\ReportCardStudents::route('/{record}/students'),
+            'students' => Pages\ReportCardStudents::route('/{record:kelas_id}/students'),
         ];
     }
     

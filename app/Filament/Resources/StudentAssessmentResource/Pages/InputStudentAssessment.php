@@ -47,14 +47,14 @@ class InputStudentAssessment extends EditRecord
                             ->label('')
                             ->content(function () {
                                 $record = $this->getRecord();
+                                $kelasInfo = $record->siswa->kelasInfo ?? null;
                                 return new HtmlString("
                                     <div class='bg-blue-50 p-4 rounded-lg border border-blue-200'>
                                         <div class='grid grid-cols-2 gap-4'>
                                             <div><strong>Nama:</strong> {$record->siswa->nama_lengkap}</div>
                                             <div><strong>NIS:</strong> {$record->siswa->nis}</div>
-                                            <div><strong>Kelas:</strong> {$record->kelas->nama_kelas}</div>
+                                            <div><strong>Kelas:</strong> " . ($kelasInfo ? $kelasInfo->nama_kelas : 'Belum ada kelas') . "</div>
                                             <div><strong>Semester:</strong> {$record->semester}</div>
-                                            <div class='col-span-2'><strong>Tahun Ajaran:</strong> {$record->academicYear->nama_tahun_ajaran}</div>
                                         </div>
                                     </div>
                                 ");

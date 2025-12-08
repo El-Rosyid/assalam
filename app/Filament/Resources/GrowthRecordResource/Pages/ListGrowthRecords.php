@@ -15,6 +15,12 @@ class ListGrowthRecords extends ListRecords
 {
     protected static string $resource = GrowthRecordResource::class;
 
+    public function getTableRecordKey($record): string
+    {
+        // Return month as the key for grouped records
+        return (string) ($record->month ?? 'unknown');
+    }
+
     protected function getHeaderActions(): array
     {
         return [
@@ -23,6 +29,18 @@ class ListGrowthRecords extends ListRecords
                 ->icon('heroicon-o-calendar-days')
                 ->color('success')
                 ->form([
+                    Select::make('kelas_id')
+                        ->label('Kelas')
+                        ->options(function () {
+                            $user = auth()->user();
+                            if (!$user || !$user->guru) {
+                                return [];
+                            }
+                            return $user->guru->kelasWali->pluck('nama_kelas', 'kelas_id');
+                        })
+                        ->required()
+                        ->searchable()
+                        ->helperText('Pilih kelas yang akan digenerate'),
                     Select::make('month')
                         ->label('Bulan')
                         ->options([
@@ -44,10 +62,10 @@ class ListGrowthRecords extends ListRecords
                         ->searchable(),
                 ])
                 ->action(function (array $data) {
-                    $this->generateMonthlyRecords($data['month']);
+                    $this->generateMonthlyRecords($data['kelas_id'], $data['month']);
                 })
                 ->modalHeading('Generate Catatan Pertumbuhan Bulanan')
-                ->modalDescription('Akan membuat template catatan pertumbuhan untuk semua siswa di kelas Anda pada bulan yang dipilih')
+                ->modalDescription('Akan membuat template catatan pertumbuhan untuk semua siswa di kelas yang dipilih pada bulan tertentu')
                 ->modalSubmitActionLabel('Generate')
                 ->modalWidth('md'),
                 
@@ -56,7 +74,7 @@ class ListGrowthRecords extends ListRecords
         ];
     }
     
-    protected function generateMonthlyRecords($month)
+    protected function generateMonthlyRecords($kelasId, $month)
     {
         $user = auth()->user();
         if (!$user || !$user->guru) {
@@ -67,14 +85,56 @@ class ListGrowthRecords extends ListRecords
             return;
         }
         
-        $records = GrowthRecord::generateSpecificMonthRecords($month, $user->guru->id);
-        
-        if (empty($records)) {
+        // Verify this kelas belongs to this wali kelas
+        $kelas = $user->guru->kelasWali->where('kelas_id', $kelasId)->first();
+        if (!$kelas) {
             Notification::make()
-                ->title('Catatan untuk bulan ini sudah ada')
+                ->title('Anda tidak memiliki akses ke kelas ini')
+                ->danger()
+                ->send();
+            return;
+        }
+        
+        // Check if records already exist for this kelas + month
+        $existingCount = GrowthRecord::where('data_kelas_id', $kelasId)
+            ->where('month', $month)
+            ->count();
+            
+        if ($existingCount > 0) {
+            Notification::make()
+                ->title("Catatan untuk {$kelas->nama_kelas} bulan ini sudah ada")
                 ->info()
                 ->send();
             return;
+        }
+        
+        // Get students in this specific kelas
+        $siswaList = \App\Models\data_siswa::where('kelas', $kelasId)->get();
+        
+        if ($siswaList->isEmpty()) {
+            Notification::make()
+                ->title('Tidak ada siswa di kelas ini')
+                ->warning()
+                ->send();
+            return;
+        }
+        
+        $records = [];
+        foreach ($siswaList as $siswa) {
+            $records[] = [
+                'siswa_nis' => $siswa->nis,
+                'data_guru_id' => $user->guru->guru_id,
+                'data_kelas_id' => $kelasId,
+                'tahun_ajaran_id' => $kelas->tahun_ajaran_id,
+                'month' => $month,
+                'year' => now()->year,
+                'lingkar_kepala' => null,
+                'lingkar_lengan' => null,
+                'berat_badan' => null,
+                'tinggi_badan' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
         }
         
         // Bulk insert the records
@@ -87,7 +147,7 @@ class ListGrowthRecords extends ListRecords
         ][$month];
         
         Notification::make()
-            ->title("Berhasil membuat " . count($records) . " template catatan pertumbuhan untuk {$monthName}")
+            ->title("Berhasil membuat " . count($records) . " template catatan pertumbuhan untuk {$kelas->nama_kelas} - {$monthName}")
             ->success()
             ->send();
     }
@@ -100,6 +160,6 @@ class ListGrowthRecords extends ListRecords
             return parent::getTableQuery()->whereRaw('1 = 0'); // Return empty result
         }
         
-        return parent::getTableQuery()->forWaliKelas($user->guru->id);
+        return parent::getTableQuery()->forWaliKelas($user->guru->guru_id);
     }
 }

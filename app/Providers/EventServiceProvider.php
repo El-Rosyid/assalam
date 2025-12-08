@@ -25,7 +25,11 @@ class EventServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Register model observers
+        \App\Models\data_siswa::observe(\App\Observers\DataSiswaObserver::class);
+        \App\Models\data_guru::observe(\App\Observers\DataGuruObserver::class);
+        // MonthlyReportObserver already registered in AppServiceProvider
+        // StudentAssessmentDetailObserver already has forceDeleting event in model boot
     }
 
     /**

@@ -38,43 +38,48 @@ class DataGuruResource extends Resource
                 ->required();
 
         return $form->schema([
-            Section::make('Data Akun Guru')
+            Section::make('Informasi Akun')
+                ->hidden(fn (?data_guru $record) => $record !== null) // Hide on edit, show only on create
                 ->schema([
-                    Hidden::make('account.user_id'),
-                    
                     TextInput::make('account.username')
-                        ->label('Username')
+                        ->label('Username (Akun)')
                         ->required()
                         ->unique(
                             table: 'users',
                             column: 'username',
-                            ignorable: fn($record) => $record?->user // biar aman saat edit
+                            ignorable: fn($record) => $record?->user?->id // fix: ignore user ID saat edit
                         )
-                        ->maxLength(255),
+                        ->maxLength(255)
+                        ->stripCharacters('— ',),
 
                     TextInput::make('account.name')
-                        ->hidden(fn ($context) => $context === 'create')
                         ->label('Nama (Akun)')
                         ->required()
                         ->maxLength(255)
                         ->helperText('Otomatis terisi dari Nama Lengkap, bisa diubah manual')
-                        ->readOnly(fn ($context) => $context === 'create') // pakai readOnly, bukan disabled
-                        ->dehydrated(true),
+                        ->stripCharacters('— ',),
 
                     TextInput::make('account.password')
                         ->label('Password')
                         ->password()
+                        ->revealable()
+                        ->autocomplete('new-password')
                         ->required(fn ($context) => $context === 'create')
-                        ->minLength(8)
+                        ->minLength(3)
                         ->same('account.passwordConfirmation')
+                        ->dehydrated(true)
                         ->dehydrateStateUsing(fn ($state) => filled($state) ? bcrypt($state) : null)
-                        ->helperText('Min. 8 karakter. Kosongkan saat edit jika tidak diubah'),
+                        ->helperText('Min. 3 karakter. Kosongkan saat edit jika tidak diubah')
+                        ->stripCharacters('— ',),
 
                     TextInput::make('account.passwordConfirmation')
                         ->label('Konfirmasi Password')
                         ->password()
+                        ->revealable()
+                        ->autocomplete('new-password')
                         ->required(fn ($context) => $context === 'create')
-                        ->dehydrated(false),
+                        ->dehydrated(false)
+                        ->stripCharacters('— ',),
                 ])
                 ->columns(2)
                 ->collapsible(),
@@ -84,6 +89,7 @@ class DataGuruResource extends Resource
                     TextInput::make('nama_lengkap')
                         ->required()
                         ->label('Nama Lengkap')
+                        ->stripCharacters('— ',)
                         ->afterStateUpdated(function ($state, $set, $get) {
                             if ($state) {
                                 // isi account.name dari nama_lengkap
@@ -94,14 +100,14 @@ class DataGuruResource extends Resource
                         }),
 
                     TextInput::make('nip')
-                        
                         ->label('NIP')
-                        ->numeric(),
+                        ->numeric()
+                        ->stripCharacters('— ',),
 
                     TextInput::make('nuptk')
-                        
                         ->label('NUPTK')
-                        ->numeric(),
+                        ->numeric()
+                        ->stripCharacters('— ',),
 
                     Select::make('jenis_kelamin')
                         ->required()
@@ -111,13 +117,27 @@ class DataGuruResource extends Resource
                             'Perempuan' => 'Perempuan',
                         ]),
 
-                    TextInput::make('tempat_lahir')->required(),
-                    DatePicker::make('tanggal_lahir')->required(),
-                    TextInput::make('no_telp')->required(),
-                    TextInput::make('email')->email(),
+                    TextInput::make('tempat_lahir')
+                        ->required()
+                        ->stripCharacters('— ',),
+                    
+                    DatePicker::make('tanggal_lahir')
+                        ->required()
+                        ->format('Y-m-d')
+                        ->displayFormat('Y-m-d'),
+                    
+                    TextInput::make('no_telp')
+                        ->required()
+                        ->stripCharacters('— ',),
+                    
+                    TextInput::make('email')
+                        ->email()
+                        ->stripCharacters('— ',),
+                    
                     Textarea::make('alamat')
-                    ->required()
-                    ->columnSpanFull(),
+                        ->required()
+                        ->columnSpanFull()
+                        ->stripCharacters('— ',),
                     
                 ])
                 ->columns(2)
@@ -172,6 +192,8 @@ class DataGuruResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return auth()->user()->can('view data admin');
+        // Only admin can access this resource
+        $user = auth()->user();
+        return $user && $user->hasRole('admin');
     }
 }

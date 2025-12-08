@@ -39,11 +39,7 @@ class Handler extends ExceptionHandler
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        // Check if request is for Filament admin panel
-        if ($request->is('admin*')) {
-            return redirect()->guest(route('filament.admin.auth.login'));
-        }
-
-        return redirect()->guest(route('login'));
+        // Redirect to custom login page
+        return redirect()->guest(route('custom.login'));
     }
 }

@@ -16,7 +16,7 @@ class VariableAssessmentResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
     
-    protected static ?string $navigationLabel = 'Assessment Variables';
+    protected static ?string $navigationLabel = 'Variabel Penilaian';
     
     protected static ?string $navigationGroup = 'Manajemen Data';
     
@@ -37,7 +37,7 @@ class VariableAssessmentResource extends Resource
                             ->required()
                             ->maxLength(255),
                         
-                        Forms\Components\Textarea::make('dekripsi')
+                        Forms\Components\Textarea::make('deskripsi')
                             ->label('Deskripsi')
                             ->rows(3)
                             ->maxLength(1000),
@@ -50,18 +50,14 @@ class VariableAssessmentResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('id')
-                    ->label('ID')
-                    ->sortable()
-                    ->searchable(),
-                
+                                
                 Tables\Columns\TextColumn::make('name')
                     ->label('Nama Variable')
                     ->sortable()
                     ->searchable()
                     ->wrap(),
                 
-                Tables\Columns\TextColumn::make('dekripsi')
+                Tables\Columns\TextColumn::make('deskripsi')
                     ->label('Deskripsi')
                     ->limit(50)
                     ->wrap()
@@ -71,7 +67,8 @@ class VariableAssessmentResource extends Resource
                             return null;
                         }
                         return $state;
-                    }),
+                    })
+                    ->searchable(),
                 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Dibuat')
@@ -121,8 +118,10 @@ class VariableAssessmentResource extends Resource
         ];
     }
     
-    public static function canViewAny(): bool
-    {
-        return true; // Allow all authenticated users for now
+     public static function canViewAny(): bool
+    {        
+        $user = auth()->user();
+        return $user && $user->hasRole('admin');
     }
+    
 }

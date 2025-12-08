@@ -9,6 +9,9 @@ use Filament\Widgets\StatsOverviewWidget\Stat;
 
 class GuruStatsOverview extends BaseWidget
 {
+    // Disable auto-refresh for better performance
+    protected static ?string $pollingInterval = null;
+    
     protected function getStats(): array
     {
         $user = auth()->user();
@@ -23,29 +26,42 @@ class GuruStatsOverview extends BaseWidget
             ];
         }
 
-        // Hitung kelas yang diampu
-        $kelasCount = data_kelas::where('walikelas_id', $guru->id)->count();
+        // Cache stats untuk 5 menit per guru
+        $guruId = $guru->guru_id;
+        $kelasCount = cache()->remember("stats.guru_{$guruId}.kelas", 300, function() use ($guruId) {
+            return data_kelas::where('walikelas_id', $guruId)->count();
+        });
         
-        // Hitung total siswa di kelas yang diampu
-        $siswaCount = data_siswa::whereHas('kelas', function($query) use ($guru) {
-            $query->where('walikelas_id', $guru->id);
-        })->count();
+        $siswaCount = cache()->remember("stats.guru_{$guruId}.siswa", 300, function() use ($guruId) {
+            return data_siswa::whereHas('kelas', function($query) use ($guruId) {
+                $query->where('walikelas_id', $guruId);
+            })->count();
+        });
 
         return [
             Stat::make('Total Kelas Diampu', $kelasCount)
                 ->description('Kelas yang Anda ampu saat ini')
                 ->descriptionIcon('heroicon-m-academic-cap')
-                ->color('success'),
+                ->color('primary')
+                ->extraAttributes([
+                    'class' => 'bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700',
+                ]),
             
             Stat::make('Total Siswa', $siswaCount)
                 ->description('Siswa di kelas yang Anda ampu')
                 ->descriptionIcon('heroicon-m-users')
-                ->color('info'),
+                ->color('success')
+                ->extraAttributes([
+                    'class' => 'bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700',
+                ]),
             
             Stat::make('Status', 'Aktif')
                 ->description('Status sebagai Wali Kelas')
                 ->descriptionIcon('heroicon-m-check-circle')
-                ->color('success'),
+                ->color('info')
+                ->extraAttributes([
+                    'class' => 'bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700',
+                ]),
         ];
     }
 

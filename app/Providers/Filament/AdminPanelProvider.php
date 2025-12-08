@@ -17,29 +17,46 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
-use App\Filament\Pages\Auth\Login;
+use Filament\Http\Responses\Auth\Contracts\LogoutResponse;
+use Filament\Http\Responses\Auth\Contracts\LoginResponse;
+use App\Http\Responses\CustomLogoutResponse;
+use App\Http\Responses\CustomLoginResponse;
+use Filament\Notifications\Notification;
 
 class AdminPanelProvider extends PanelProvider
 {
+    public function boot(): void
+    {
+        // Custom logout response - redirect to custom login page
+        $this->app->bind(LogoutResponse::class, CustomLogoutResponse::class);
+        
+        // Custom login response - redirect to admin dashboard
+        $this->app->bind(LoginResponse::class, CustomLoginResponse::class);
+    }
+
     public function panel(Panel $panel): Panel
     {
         return $panel
+            ->brandName('TK ABA ASSALAM')
             ->default()
             ->sidebarCollapsibleOnDesktop(true)
             ->id('admin')
             ->path('admin')
-            ->login(Login::class)
+            ->authGuard('web')
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => Color::Indigo,
             ])
+            ->databaseNotifications()
+            ->databaseNotificationsPolling('30s') // Changed from 10s to reduce server load
+            ->globalSearchKeyBindings(['command+k', 'ctrl+k'])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
                 Pages\Dashboard::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
-            ->widgets([
-                Widgets\AccountWidget::class,
+            ->widgets([                
+                \App\Filament\Widgets\SchoolStatsOverview::class,
             ])
             ->middleware([
                 EncryptCookies::class,
@@ -53,7 +70,7 @@ class AdminPanelProvider extends PanelProvider
                 DispatchServingFilamentEvent::class,
             ])
             ->authMiddleware([
-                Authenticate::class,
+                \App\Http\Middleware\FilamentAuthenticate::class,
             ]);
     }
 }

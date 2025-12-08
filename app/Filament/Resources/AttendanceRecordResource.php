@@ -41,7 +41,7 @@ class AttendanceRecordResource extends Resource
                 // Only show classes where current user is wali kelas
                 $user = auth()->user();
                 if ($user && $user->guru) {
-                    $query->where('walikelas_id', $user->guru->id);
+                    $query->where('walikelas_id', $user->guru->guru_id);
                 }
                 return $query;
             })
@@ -74,7 +74,7 @@ class AttendanceRecordResource extends Resource
                     ->label('Kelola')
                     ->icon('heroicon-o-pencil-square')
                     ->color('primary')
-                    ->url(fn (data_kelas $record): string => route('filament.admin.resources.attendance-records.manage', ['record' => $record->id]))
+                    ->url(fn (data_kelas $record): string => route('filament.admin.resources.attendance-records.manage', ['record' => $record->kelas_id]))
             ])
             ->bulkActions([
                 // No bulk actions needed
@@ -94,7 +94,7 @@ class AttendanceRecordResource extends Resource
     {
         return [
             'index' => Pages\ListAttendanceRecords::route('/'),
-            'manage' => Pages\ManageAttendanceRecord::route('/{record:id}/manage'),
+            'manage' => Pages\ManageAttendanceRecord::route('/{record:kelas_id}/manage'),
         ];
     }
     

@@ -17,26 +17,34 @@ use Illuminate\Support\Facades\Hash;
 class UserResource extends Resource
 {
     protected static ?string $model = User::class;
-
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationLabel = 'Manajemen User';
+    protected static ?string $navigationIcon = 'heroicon-o-users';
+    protected static ?string $navigationGroup = 'Manajemen Data';
+    protected static ?string $pluralLabel = 'Data User';
 
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
                 Forms\Components\TextInput::make('name')
+                    ->label('Nama')
                     ->required()
-                    ->maxLength(255),
+                    ->maxLength(50),
                 Forms\Components\TextInput::make('username')
-                    ->email()
+                    ->label('Username')                    
                     ->required()
-                    ->maxLength(255),
+                    ->unique(table: 'users', column: 'username', ignoreRecord: true)
+                    ->maxLength(50),
                 Forms\Components\TextInput::make('password')
+                    ->label('Password')
                     ->password()
+                    ->revealable()
                     ->required(fn (string $context): bool => $context === 'create')
-                    ->maxLength(255)
-                    ->dehydrated(fn (string $context): bool => $context === 'create')
-                    ->dehydrateStateUsing(fn ($state) => Hash::make($state)),
+                    ->minLength(3)
+                    ->maxLength(10)
+                    ->dehydrated(fn ($state) => filled($state))
+                    ->dehydrateStateUsing(fn ($state) => filled($state) ? Hash::make($state) : null)
+                    ->helperText('Min. 3 karakter. Kosongkan jika tidak ingin mengubah password'),
                 Forms\Components\Select::make('roles')
                     ->multiple()
                     ->relationship('roles', 'name')

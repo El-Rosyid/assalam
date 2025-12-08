@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('assessment_variable', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->text('dekripsi')->nullable();
+            $table->text('deskripsi')->nullable();
             $table->timestamps();
         });
     }

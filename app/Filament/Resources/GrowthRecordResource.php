@@ -10,8 +10,9 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Columns\TextColumn;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 class GrowthRecordResource extends Resource
 {
@@ -29,156 +30,217 @@ class GrowthRecordResource extends Resource
     
     protected static ?string $pluralModelLabel = 'Catatan Pertumbuhan';
 
+    // Disable default form - we'll use custom page
     public static function form(Form $form): Form
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Data Pertumbuhan')
-                    ->schema([
-                        Forms\Components\Select::make('data_siswa_id')
-                            ->label('Siswa')
-                            ->relationship('siswa', 'nama_lengkap')
-                            ->searchable()
-                            ->preload()
-                            ->required(),
-                            
-                        Forms\Components\Select::make('month')
-                            ->label('Bulan')
-                            ->options([
-                                1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-                                5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-                                9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
-                            ])
-                            ->required()
-                            ->default(now()->month),
-                    ])
-                    ->columns(2),
-                    
-                Forms\Components\Section::make('Hasil Pengukuran')
-                    ->schema([
-                        Forms\Components\TextInput::make('lingkar_kepala')
-                            ->label('Lingkar Kepala (cm)')
-                            ->numeric()
-                            ->step(0.1)
-                            ->minValue(0)
-                            ->maxValue(100)
-                            ->suffix('cm'),
-                            
-                        Forms\Components\TextInput::make('lingkar_lengan')
-                            ->label('Lingkar Lengan (cm)')
-                            ->numeric()
-                            ->step(0.1)
-                            ->minValue(0)
-                            ->maxValue(50)
-                            ->suffix('cm'),
-                            
-                        Forms\Components\TextInput::make('berat_badan')
-                            ->label('Berat Badan (kg)')
-                            ->numeric()
-                            ->step(0.1)
-                            ->minValue(0)
-                            ->maxValue(100)
-                            ->suffix('kg'),
-                            
-                        Forms\Components\TextInput::make('tinggi_badan')
-                            ->label('Tinggi Badan (cm)')
-                            ->numeric()
-                            ->step(0.1)
-                            ->minValue(0)
-                            ->maxValue(200)
-                            ->suffix('cm'),
-                    ])
-                    ->columns(2)
-            ]);
+        return $form->schema([]);
     }
 
     public static function table(Table $table): Table
     {
         return $table
             ->modifyQueryUsing(function (Builder $query) {
-                // Only show records for current user's class
+                // Get current user's classes
                 $user = auth()->user();
                 if ($user && $user->guru) {
-                    $query->forWaliKelas($user->guru->id);
+                    // Get kelas for this wali kelas
+                    $kelasIds = $user->guru->kelasWali->pluck('kelas_id');
+                    
+                    if ($kelasIds->isNotEmpty()) {
+                        // Get current students in the wali kelas's classes
+                        $currentStudentNis = \App\Models\data_siswa::whereIn('kelas', $kelasIds)
+                            ->pluck('nis');
+                        
+                        if ($currentStudentNis->isNotEmpty()) {
+                            // Query growth records that match current students only
+                            $query->select([
+                                'data_kelas_id',
+                                'month',
+                                DB::raw('COUNT(DISTINCT growth_records.siswa_nis) as total_students'),
+                                DB::raw('SUM(CASE WHEN lingkar_kepala IS NOT NULL OR lingkar_lengan IS NOT NULL OR berat_badan IS NOT NULL OR tinggi_badan IS NOT NULL THEN 1 ELSE 0 END) as filled_count'),
+                                DB::raw('CONCAT(data_kelas_id, "-", month) as id')
+                            ])
+                            ->where('data_guru_id', $user->guru->guru_id)
+                            ->whereIn('siswa_nis', $currentStudentNis)
+                            ->whereIn('data_kelas_id', $kelasIds)
+                            ->groupBy('data_kelas_id', 'month')
+                            ->orderBy('data_kelas_id', 'asc')
+                            ->orderBy('month', 'desc');
+                        } else {
+                            // No students in class, return empty result
+                            $query->whereRaw('1 = 0');
+                        }
+                    } else {
+                        // No class assigned, return empty result
+                        $query->whereRaw('1 = 0');
+                    }
                 }
                 return $query;
             })
             ->columns([
-                Tables\Columns\TextColumn::make('siswa.nama_lengkap')
-                    ->label('Nama Siswa')
+                TextColumn::make('id')
+                    ->label('No')
+                    ->rowIndex(),
+                    
+                TextColumn::make('data_kelas_id')
+                    ->label('Kelas')
+                    ->formatStateUsing(function ($state) {
+                        $kelas = \App\Models\data_kelas::find($state);
+                        return $kelas ? $kelas->nama_kelas : '-';
+                    })
                     ->sortable()
                     ->searchable(),
                     
-                Tables\Columns\TextColumn::make('siswa.nis')
-                    ->label('NIS')
+                TextColumn::make('month')
+                    ->label('Periode')
+                    ->formatStateUsing(function ($record) {
+                        $months = [
+                            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+                            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+                            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+                        ];
+                        return $months[$record->month] . ' ' . now()->year;
+                    })
                     ->sortable()
                     ->searchable(),
                     
-                Tables\Columns\TextColumn::make('bulan_tahun')
-                    ->label('Bulan')
-                    ->sortable(['month'])
-                    ->searchable(),
+                TextColumn::make('total_students')
+                    ->label('Total Siswa')
+                    ->alignCenter(),
                     
-                Tables\Columns\TextInputColumn::make('lingkar_kepala')
-                    ->label('L. Kepala (cm)')
-                    ->type('number')
-                    ->step(0.1),
-                    
-                Tables\Columns\TextInputColumn::make('lingkar_lengan')
-                    ->label('L. Lengan (cm)')
-                    ->type('number')
-                    ->step(0.1),
-                    
-                Tables\Columns\TextInputColumn::make('berat_badan')
-                    ->label('BB (kg)')
-                    ->type('number')
-                    ->step(0.1),
-                    
-                Tables\Columns\TextInputColumn::make('tinggi_badan')
-                    ->label('TB (cm)')
-                    ->type('number')
-                    ->step(0.1),
-                    
-                Tables\Columns\TextColumn::make('bmi')
-                    ->label('BMI')
-                    ->getStateUsing(fn (GrowthRecord $record): ?string => 
-                        $record->bmi ? number_format($record->bmi, 2) : '-'
-                    )
-                    ->badge()
-                    ->color(fn (?string $state): string => match (true) {
-                        !$state || $state === '-' => 'gray',
-                        (float) $state < 18.5 => 'warning',
-                        (float) $state > 25 => 'danger',
-                        default => 'success',
-                    }),
+                TextColumn::make('filled_count')
+                    ->label('Sudah Diisi')
+                    ->alignCenter(),
             ])
             ->filters([
-                SelectFilter::make('data_siswa_id')
-                    ->label('Siswa')
-                    ->relationship('siswa', 'nama_lengkap')
-                    ->searchable()
-                    ->preload(),
-                    
-                SelectFilter::make('month')
-                    ->label('Bulan')
-                    ->options([
-                        1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-                        5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-                        9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
-                    ]),
+                // No filters for grouped view
             ])
             ->actions([
-                Tables\Actions\EditAction::make()
-                    ->modalWidth('3xl'),
+                Tables\Actions\Action::make('kelola')
+                    ->label('Kelola')
+                    ->icon('heroicon-o-pencil-square')
+                    ->color('primary')
+                    ->url(function ($record) {
+                        return static::getUrl('manage', [
+                            'month' => $record->month,
+                            'kelas' => $record->data_kelas_id,
+                        ]);
+                    }),
                     
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\Action::make('delete')
+                    ->label('Hapus')
+                    ->icon('heroicon-o-trash')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('Hapus Catatan Pertumbuhan')
+                    ->modalDescription(function ($record) {
+                        $months = [
+                            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+                            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+                            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+                        ];
+                        $monthName = $months[$record->month] . ' ' . now()->year;
+                        $kelas = \App\Models\data_kelas::find($record->data_kelas_id);
+                        $kelasName = $kelas ? $kelas->nama_kelas : 'Unknown';
+                        return "Apakah Anda yakin ingin menghapus semua catatan pertumbuhan untuk {$kelasName} bulan {$monthName}?";
+                    })
+                    ->action(function ($record) {
+                        try {
+                            $month = $record->month;
+                            $kelasId = $record->data_kelas_id;
+                            
+                            $deleted = GrowthRecord::where('month', $month)
+                                ->where('data_kelas_id', $kelasId)
+                                ->delete();
+                            
+                            \Filament\Notifications\Notification::make()
+                                ->title('Berhasil Dihapus')
+                                ->body("Berhasil menghapus {$deleted} catatan pertumbuhan.")
+                                ->success()
+                                ->send();
+                                
+                        } catch (\Exception $e) {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Gagal Menghapus')
+                                ->body('Error: ' . $e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
             ])
+            ->headerActions([
+                Tables\Actions\Action::make('sync_missing')
+                    ->label('Sinkronkan Siswa')
+                    ->icon('heroicon-o-user-plus')
+                    ->color('success')
+                    ->action(function () {
+                        $user = auth()->user();
+                        if ($user && $user->guru) {
+                            $createdCount = GrowthRecord::ensureAllStudentsHaveRecords($user->guru->guru_id);
+                            
+                            \Filament\Notifications\Notification::make()
+                                ->title('Sinkronisasi Selesai')
+                                ->body("Berhasil menambahkan {$createdCount} catatan untuk siswa yang belum ada.")
+                                ->success()
+                                ->send();
+                        }
+                    }),
+                    
+                Tables\Actions\Action::make('clean_data')
+                    ->label('Bersihkan Data')
+                    ->icon('heroicon-o-trash')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('Bersihkan Data Tidak Valid')
+                    ->modalDescription('Menghapus catatan pertumbuhan untuk siswa yang sudah tidak ada di kelas Anda. Data siswa yang masih aktif tidak akan terhapus.')
+                    ->action(function () {
+                        $user = auth()->user();
+                        if ($user && $user->guru) {
+                            // Get current students
+                            $kelasIds = $user->guru->kelasWali->pluck('kelas_id');
+                            $currentStudentNis = \App\Models\data_siswa::whereIn('kelas', $kelasIds)->pluck('nis');
+                            
+                            // Delete orphaned records
+                            $deletedCount = GrowthRecord::where('data_guru_id', $user->guru->guru_id)
+                                ->whereNotIn('siswa_nis', $currentStudentNis)
+                                ->delete();
+                            
+                            \Filament\Notifications\Notification::make()
+                                ->title('Data Dibersihkan')
+                                ->body("Berhasil menghapus {$deletedCount} catatan untuk siswa yang tidak aktif.")
+                                ->success()
+                                ->send();
+                        }
+                    }),
+            ])
+            ->emptyStateHeading('Belum Ada Data Pertumbuhan')
+            ->emptyStateDescription('Klik tombol "Generate Bulan Baru" untuk membuat catatan pertumbuhan.')
+            ->emptyStateIcon('heroicon-o-chart-bar-square')
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\BulkAction::make('delete')
+                        ->label('Hapus yang Dipilih')
+                        ->icon('heroicon-o-trash')
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->modalHeading('Hapus Catatan Pertumbuhan yang Dipilih')
+                        ->modalDescription('Apakah Anda yakin ingin menghapus semua data untuk bulan yang dipilih? Tindakan ini tidak dapat diurungkan.')
+                        ->action(function (\Illuminate\Database\Eloquent\Collection $records) {
+                            $totalDeleted = 0;
+                            foreach ($records as $record) {
+                                $deleted = GrowthRecord::where('month', $record->month)
+                                    ->where('data_kelas_id', $record->data_kelas_id)
+                                    ->delete();
+                                $totalDeleted += $deleted;
+                            }
+                            \Filament\Notifications\Notification::make()
+                                ->title('Data Dihapus')
+                                ->body("Berhasil menghapus {$totalDeleted} catatan pertumbuhan.")
+                                ->success()
+                                ->send();
+                        })
                 ]),
-            ])
-            ->defaultSort('month', 'desc');
+            ]);
     }
 
     public static function getRelations(): array
@@ -192,16 +254,13 @@ class GrowthRecordResource extends Resource
     {
         return [
             'index' => Pages\ListGrowthRecords::route('/'),
-            'create' => Pages\CreateGrowthRecord::route('/create'),
-            'edit' => Pages\EditGrowthRecord::route('/{record}/edit'),
+            'manage' => Pages\ManageGrowthRecords::route('/manage/{kelas}/{month}'),
         ];
     }
     
     public static function canCreate(): bool
     {
-        // Allow create for wali kelas
-        $user = auth()->user();
-        return $user && $user->guru;
+        return false; // Disable manual create
     }
     
     public static function canViewAny(): bool

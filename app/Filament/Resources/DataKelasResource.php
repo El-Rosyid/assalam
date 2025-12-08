@@ -46,10 +46,26 @@ class DataKelasResource extends Resource
             ->schema([
                 Section::make('Tambah Data Kelas')
                     ->schema([
-                        TextInput::make('nama_kelas')
+                        Select::make('tingkat')
                             ->required()
+                            ->label('Kelas')
+                            ->placeholder('--pilih kelas--')
+                            ->options([
+                                1 => 'Kelas A (TK A)',
+                                2 => 'Kelas B (TK B)',
+                            ])
+                            ->live()
+                            ->afterStateUpdated(function ($state, callable $set) {
+                                // Auto-fill nama_kelas berdasarkan tingkat
+                                $nama = $state == 1 ? 'Kelas A' : ($state == 2 ? 'Kelas B' : '');
+                                $set('nama_kelas', $nama);
+                            })
+                            ->searchable(),
+                        TextInput::make('nama_kelas')
                             ->label('Nama Kelas')
-                            ->placeholder('Ketik Nama Kelas'),
+                            ->disabled()
+                            ->dehydrated()
+                            ->helperText('Otomatis terisi dari tingkat yang dipilih'),
                         Select::make('walikelas_id')
                             ->required()
                             ->label('Wali Kelas')
@@ -68,7 +84,7 @@ class DataKelasResource extends Resource
                                         } else {
                                             $identifier = ' (Guru Honor)';
                                         }
-                                        return [$guru->id => $guru->nama_lengkap . $identifier];
+                                        return [$guru->guru_id => $guru->nama_lengkap . $identifier];
                                     });
                             })
                             ->searchable()
@@ -82,21 +98,11 @@ class DataKelasResource extends Resource
                                 return academic_year::orderBy('year', 'desc')
                                     ->get()
                                     ->mapWithKeys(function ($item) {
-                                        return [$item->id => $item->year . ' - ' . $item->semester];
+                                        return [$item->tahun_ajaran_id => $item->year . ' - ' . $item->semester];
                                     });
                             })
                             ->searchable()
                             ->preload()
-                            ->nullable(),
-                        Select::make('tingkat')
-                            ->required()
-                            ->label('Tingkat')
-                            ->placeholder('--pilih tingkat--')
-                            ->options([
-                                1=> 'TK Kelas A',
-                                2=> 'TK Kelas B',
-                            ])
-                            ->searchable()
                             ->nullable(),
                     ])
                     ->columns(2),
@@ -107,14 +113,16 @@ class DataKelasResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('id')
+                TextColumn::make('kelas_id')
                     ->label('ID Kelas')
                     ->sortable()
                     ->searchable(),
                 TextColumn::make('nama_kelas')
-                    ->label('Nama Kelas')
+                    ->label('Kelas')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->badge()
+                    ->color(fn ($record) => $record->tingkat == 1 ? 'success' : 'info'),
                 TextColumn::make('walikelas.nama_lengkap')
                     ->label('Wali Kelas')
                     ->searchable()
@@ -123,13 +131,6 @@ class DataKelasResource extends Resource
                     ->wrap()
                     ->description(fn ($record) => $record->walikelas ? $record->walikelas->nip
                         ? 'NIP: ' . $record->walikelas->nip : 'Tidak ada NIP' : 'Tidak ada wali kelas'),
-                TextColumn::make('tingkat')
-                    ->label('Tingkat')
-                    ->searchable()
-                    ->sortable()
-                    ->alignCenter()
-                    ->badge()
-                    ->color('info'),
                  TextColumn::make('siswa_count')
                     ->label('Jumlah Siswa')
                     ->counts('siswa')
@@ -145,10 +146,10 @@ class DataKelasResource extends Resource
                 ])
             ->filters([
                 SelectFilter::make('tingkat')
-                    ->label('Tingkat')
+                    ->label('Filter Kelas')
                     ->options([
-                        1 => 'Kelas A',
-                        2 => 'Kelas B',
+                        1 => 'Kelas A (TK A)',
+                        2 => 'Kelas B (TK B)',
                     ]),
             ])
             ->actions([
@@ -225,7 +226,7 @@ class DataKelasResource extends Resource
                                     return data_kelas::orderBy('nama_kelas')
                                         ->get()
                                         ->mapWithKeys(function ($kelas) {
-                                            return [$kelas->id => $kelas->nama_kelas . ' (Tingkat ' . $kelas->tingkat . ')'];
+                                            return [$kelas->kelas_id => $kelas->nama_kelas . ' (Tingkat ' . $kelas->tingkat . ')'];
                                         });
                                 })
                                 ->searchable()
@@ -307,20 +308,25 @@ class DataKelasResource extends Resource
                         ])
                         ->action(function (array $data, $records) {
                             $tingkatBaru = $data['tingkat_baru'];
+                            $namaKelasBaru = $tingkatBaru == 1 ? 'Kelas A' : 'Kelas B';
                             $namaKelas = [];
                             $jumlahKelas = count($records);
                             
                             foreach ($records as $kelas) {
-                                $kelas->update(['tingkat' => $tingkatBaru]);
-                                $namaKelas[] = $kelas->nama_kelas;
+                                // Update tingkat DAN nama_kelas agar konsisten
+                                $kelas->update([
+                                    'tingkat' => $tingkatBaru,
+                                    'nama_kelas' => $namaKelasBaru
+                                ]);
+                                $namaKelas[] = $namaKelasBaru;
                             }
                             
-                            $tingkatLabel = $tingkatBaru == 1 ? 'TK Kelas A' : 'TK Kelas B';
+                            $tingkatLabel = $tingkatBaru == 1 ? 'Kelas A (TK A)' : 'Kelas B (TK B)';
                             
                             Notification::make()
                                 ->success()
                                 ->title('Tingkat Kelas Berhasil Diubah!')
-                                ->body("$jumlahKelas kelas (" . implode(', ', $namaKelas) . ") telah diubah ke tingkat $tingkatLabel.")
+                                ->body("$jumlahKelas kelas telah diubah ke $tingkatLabel.")
                                 ->duration(8000)
                                 ->send();
                         })
@@ -350,7 +356,7 @@ class DataKelasResource extends Resource
                                             } else {
                                                 $identifier = ' (Guru Honor)';
                                             }
-                                            return [$guru->id => $guru->nama_lengkap . $identifier];
+                                            return [$guru->guru_id => $guru->nama_lengkap . $identifier];
                                         });
                                 })
                                 ->searchable()
@@ -393,7 +399,7 @@ class DataKelasResource extends Resource
                                     return academic_year::orderBy('year', 'desc')
                                         ->get()
                                         ->mapWithKeys(function ($item) {
-                                            return [$item->id => $item->year . ' - ' . $item->semester];
+                                            return [$item->tahun_ajaran_id => $item->year . ' - ' . $item->semester];
                                         });
                                 })
                                 ->searchable()
@@ -444,7 +450,8 @@ class DataKelasResource extends Resource
         ];
     }
     public static function canViewAny(): bool
-    {
-        return auth()->user()->can('view data admin');
+    {        
+        $user = auth()->user();
+        return $user && $user->hasRole('admin');
     }
 }

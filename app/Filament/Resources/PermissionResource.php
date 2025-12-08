@@ -70,4 +70,5 @@ class PermissionResource extends Resource
     {
         return auth()->user()->can('view data admin');
     }
+    
 }

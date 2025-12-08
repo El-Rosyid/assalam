@@ -10,11 +10,10 @@ trait HasBackButton
     {
         return [
             Action::make('back')
-                ->icon('heroicon-o-arrow-left')
-                 ->label('Kembali')
-                ->url(static::getResource()::getUrl())
-                ->color('gray')
-                ->button(),
+                ->label('Kembali')
+                ->url($this->getResource()::getUrl('index'))
+                ->button()
+                ->color('gray'),
         ];
     }
 }

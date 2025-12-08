@@ -48,10 +48,32 @@ class SekolahResource extends Resource
                     ->required()->label('NSS')->numeric(),
                 TextInput::make('kode_pos')
                     ->required()->label('Kode Pos')->numeric(),
-                TextInput::make('kepala_sekolah')
-                    ->required()->label('Kepala Sekolah'),
+                
+                Forms\Components\Select::make('kepala_sekolah_id')
+                    ->label('Kepala Sekolah')
+                    ->relationship('kepalaSekolah', 'nama_lengkap')
+                    ->searchable()
+                    ->preload()
+                    ->required()
+                    ->live()
+                    ->afterStateUpdated(function ($state, Forms\Set $set) {
+                        if ($state) {
+                            $guru = \App\Models\data_guru::find($state);
+                            if ($guru) {
+                                $set('nip_kepala_sekolah', $guru->nip);
+                            }
+                        } else {
+                            $set('nip_kepala_sekolah', null);
+                        }
+                    }),
+                    
                 TextInput::make('nip_kepala_sekolah')
-                    ->required()->label('NIP Kepala Sekolah')->numeric(),
+                    ->label('NIP Kepala Sekolah')
+                    ->numeric()
+                    ->disabled()
+                    ->dehydrated()
+                    ->helperText('NIP akan terisi otomatis setelah memilih kepala sekolah'),
+                    
                 FileUpload::make('logo_sekolah')->label('Logo Sekolah')->image()->nullable(),  
             ]);
     }
@@ -65,7 +87,11 @@ class SekolahResource extends Resource
                 TextColumn::make('npsn')->label('NPSN')->searchable()->sortable(),
                 TextColumn::make('nss')->label('NSS')->searchable()->sortable(),
                 TextColumn::make('kode_pos')->label('Kode Pos')->searchable()->sortable(),
-                TextColumn::make('kepala_sekolah')->label('Kepala Sekolah')->searchable()->sortable(),
+                TextColumn::make('kepalaSekolah.nama_lengkap')
+                    ->label('Kepala Sekolah')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('nip_kepala_sekolah')->label('NIP Kepala Sekolah')->searchable()->sortable(),
                 ImageColumn::make('logo_sekolah')->label('Logo Sekolah')->rounded(),                
                 TextColumn::make('created_at')
                     ->dateTime()
@@ -110,7 +136,7 @@ class SekolahResource extends Resource
     }
     public static function getNavigationUrl(): string
     {
-        $sekolah = \App\Models\sekolah::first();
+        $sekolah = \App\Models\Sekolah::first();
 
         return $sekolah
             ? static::getUrl('edit', ['record' => $sekolah->getKey()])
@@ -118,9 +144,10 @@ class SekolahResource extends Resource
     }
 
 
-    public static function canViewAny(): bool
-    {
-        return auth()->user()->can('view data admin');
+     public static function canViewAny(): bool
+    {        
+        $user = auth()->user();
+        return $user && $user->hasRole('admin');
     }
 
 }

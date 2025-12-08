@@ -29,7 +29,7 @@ class ManageAttendanceRecord extends ViewRecord implements HasTable
         
         // Check if current user is wali kelas of this class
         $user = auth()->user();
-        if (!$user || !$user->guru || $this->record->walikelas_id !== $user->guru->id) {
+        if (!$user || !$user->guru || $this->record->walikelas_id !== $user->guru->guru_id) {
             abort(403, 'Anda tidak memiliki akses ke kelas ini.');
         }
         
@@ -62,7 +62,7 @@ class ManageAttendanceRecord extends ViewRecord implements HasTable
     public function table(Table $table): Table
     {
         return $table
-            ->query(AttendanceRecord::query()->where('data_kelas_id', $this->record->id))
+            ->query(AttendanceRecord::query()->where('data_kelas_id', $this->record->kelas_id))
             ->columns([
                 Tables\Columns\TextColumn::make('siswa.nama_lengkap')
                     ->label('Nama Siswa')
@@ -121,7 +121,7 @@ class ManageAttendanceRecord extends ViewRecord implements HasTable
     protected function generateAttendanceRecords(): void
     {
         $user = auth()->user();
-        $records = AttendanceRecord::generateAttendanceRecords($user->guru->id, $this->record->id);
+        $records = AttendanceRecord::generateAttendanceRecords($user->guru->guru_id, $this->record->kelas_id);
         
         if (!empty($records)) {
             AttendanceRecord::insert($records);

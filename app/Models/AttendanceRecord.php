@@ -14,7 +14,7 @@ class AttendanceRecord extends Model
     protected $fillable = [
         'data_guru_id',
         'data_kelas_id',
-        'data_siswa_id',
+        'siswa_nis',
         'alfa',
         'ijin',
         'sakit',
@@ -39,7 +39,7 @@ class AttendanceRecord extends Model
     
     public function siswa()
     {
-        return $this->belongsTo(data_siswa::class, 'data_siswa_id');
+        return $this->belongsTo(data_siswa::class, 'siswa_nis', 'nis');
     }
     
     // Accessors
@@ -65,13 +65,13 @@ class AttendanceRecord extends Model
         $records = [];
         
         foreach ($siswaList as $siswa) {
-            $existingRecord = self::where('data_siswa_id', $siswa->id)->first();
+            $existingRecord = self::where('siswa_nis', $siswa->nis)->first();
             
             if (!$existingRecord) {
                 $records[] = [
                     'data_guru_id' => $guruId,
                     'data_kelas_id' => $kelasId,
-                    'data_siswa_id' => $siswa->id,
+                    'siswa_nis' => $siswa->nis,
                     'alfa' => 0,
                     'ijin' => 0,
                     'sakit' => 0,

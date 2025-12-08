@@ -34,9 +34,9 @@ class ReportCardStudents extends Page implements HasTable
         // Check authorization
         $user = auth()->user();
         if ($user && $user->guru) {
-            $isKepalaSekolah = \App\Models\sekolah::where('kepala_sekolah', $user->guru->id)->exists();
+            $isKepalaSekolah = \App\Models\Sekolah::where('kepala_sekolah', $user->guru->guru_id)->exists();
             
-            if (!$isKepalaSekolah && $record->walikelas_id !== $user->guru->id) {
+            if (!$isKepalaSekolah && $record->walikelas_id !== $user->guru->guru_id) {
                 abort(403, 'Anda tidak memiliki akses ke kelas ini.');
             }
         } else {
@@ -49,7 +49,7 @@ class ReportCardStudents extends Page implements HasTable
         return $table
             ->query(
                 data_siswa::query()
-                    ->where('kelas', $this->record->id)
+                    ->where('kelas', $this->record->kelas_id)
                     ->orderBy('nama_lengkap')
             )
             ->columns([
@@ -70,21 +70,21 @@ class ReportCardStudents extends Page implements HasTable
                 Tables\Columns\TextColumn::make('assessments_count')
                     ->label('Penilaian')
                     ->getStateUsing(function (data_siswa $record) {
-                        $count = \App\Models\student_assessment::where('data_siswa_id', $record->id)->count();
+                        $count = \App\Models\student_assessment::where('siswa_nis', $record->nis)->count();
                         return $count . ' penilaian';
                     }),
                     
                 Tables\Columns\TextColumn::make('growth_records_count')
                     ->label('Pertumbuhan')
                     ->getStateUsing(function (data_siswa $record) {
-                        $count = GrowthRecord::where('data_siswa_id', $record->id)->count();
+                        $count = GrowthRecord::where('siswa_nis', $record->nis)->count();
                         return $count . ' record';
                     }),
                     
                 Tables\Columns\TextColumn::make('attendance_records_count')
                     ->label('Kehadiran')
                     ->getStateUsing(function (data_siswa $record) {
-                        $attendance = AttendanceRecord::where('data_siswa_id', $record->id)->first();
+                        $attendance = AttendanceRecord::where('siswa_nis', $record->nis)->first();
                         if ($attendance) {
                             $total = ($attendance->alfa ?? 0) + ($attendance->ijin ?? 0) + ($attendance->sakit ?? 0);
                             return $total > 0 ? $total . ' absen' : 'Hadir';
@@ -93,27 +93,12 @@ class ReportCardStudents extends Page implements HasTable
                     }),
             ])
             ->actions([
-                Tables\Actions\Action::make('print_pdf')
-                    ->label('Print')
-                    ->icon('heroicon-o-printer')
+                Tables\Actions\Action::make('view_pdf')
+                    ->label('Lihat PDF')
+                    ->icon('heroicon-o-eye')
                     ->color('primary')
-                    ->modalHeading('Print Raport')
-                    ->modalContent(function (data_siswa $record) {
-                        return view('raport.print-modal', ['siswa' => $record]);
-                    })
-                    ->modalWidth('7xl')
-                    ->modalSubmitAction(false)
-                    ->modalCancelActionLabel('Tutup')
-                    ->extraModalFooterActions([
-                        Tables\Actions\Action::make('download_from_modal')
-                            ->label('Download PDF')
-                            ->icon('heroicon-o-document-arrow-down')
-                            ->color('success')
-                            ->url(function (data_siswa $record) {
-                                return route('download.raport', ['siswa' => $record->id]);
-                            })
-                            ->openUrlInNewTab(),
-                    ]),
+                    ->url(fn (data_siswa $record) => route('view.raport.inline', $record))
+                    ->openUrlInNewTab(),
             ])
             ->emptyStateHeading('Tidak ada siswa')
             ->emptyStateDescription('Tidak ada siswa di kelas ' . $this->record->nama_kelas . '.');

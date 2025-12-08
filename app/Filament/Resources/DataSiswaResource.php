@@ -49,15 +49,16 @@ class DataSiswaResource extends Resource
         return $form
             ->schema([
                 Section::make('Data Akun Siswa')
-                    ->description('Username akan otomatis terisi dari NISN')
+                    ->description('Username dan password akan otomatis terisi dari NIP')
+                    ->hidden(fn (?data_siswa $record) => $record !== null) // Hide on edit, show only on create
                     ->schema([
                         TextInput::make('account.user_id')
                             ->hidden(),
                         TextInput::make('account.username')
                             ->label('Username')
                             ->required()                            
-                            ->maxLength(255)
-                            ->helperText('Otomatis terisi dari NISN')
+                            ->maxLength(50)
+                            ->helperText('Otomatis terisi dari NIP')
                             ->disabled(fn ($context) => $context === 'create')
                             ->dehydrated(true)
                              ->unique(
@@ -82,17 +83,17 @@ class DataSiswaResource extends Resource
                             ->label('Password')
                             ->password()
                             ->required(fn ($context) => $context === 'create')
-                            ->minLength(8)
+                            ->minLength(3)
                             ->same('account.passwordConfirmation')
                             ->dehydrated(fn ($state) => filled($state))
                             ->dehydrateStateUsing(fn ($state) => filled($state) ? $state : null)
-                            ->helperText('Min. 8 karakter. Kosongkan jika tidak ingin mengubah password'),
+                            ->helperText('Min. 3 karakter. Kosongkan jika tidak ingin mengubah password'),
                         
                         TextInput::make('account.passwordConfirmation')
                             ->label('Konfirmasi Password')
                             ->password()
                             ->required(fn ($context) => $context === 'create')
-                            ->minLength(8)
+                            ->minLength(3)
                             ->dehydrated(false)
                             ->visible(fn ($context) => $context === 'create' || fn ($get) => filled($get('account.password'))),
                     ])
@@ -103,19 +104,27 @@ class DataSiswaResource extends Resource
                     ->schema([
                         TextInput::make('nisn')
                             ->label('NISN')
-                            ->required()
+                            ->nullable()
                             ->numeric()
                             ->length(10)
-                            ->unique('data_siswa', 'nisn', ignoreRecord: true)
+                            ->unique('data_siswa', 'nisn', ignoreRecord: true),
+                        
+                        TextInput::make('nis')
+                            ->label('NIP')
+                            ->required()
+                            ->minLength(3)
+                            ->maxLength(4)
+                            ->numeric()
+                            ->unique('data_siswa', 'nis', ignoreRecord: true)
                             ->live(onBlur: true)
                             ->afterStateUpdated(function ($state, $set, $get, $context) {
                                 if ($state) {
-                                    // Auto-fill username dari NISN
+                                    // Auto-fill username dari NIS
                                     if (!$get('account.username')) {
                                         $set('account.username', $state);
                                     }
                                     
-                                    // Auto-fill password default dari NISN (hanya saat create)
+                                    // Auto-fill password default dari NIS (hanya saat create)
                                     if ($context === 'create' && !$get('account.password')) {
                                         $set('account.password', $state);
                                         $set('account.passwordConfirmation', $state);
@@ -123,16 +132,11 @@ class DataSiswaResource extends Resource
                                 }
                             }),
                         
-                        TextInput::make('nis')
-                            ->label('NIS')
-                            ->required()
-                            ->numeric()
-                            ->unique('data_siswa', 'nis', ignoreRecord: true),
-                        
                         TextInput::make('nama_lengkap')
                             ->label('Nama Lengkap')
                             ->required()
                             ->maxLength(255)
+                            ->live(onBlur: true)
                             ->afterStateUpdated(function ($state, $set, $get) {
                                 if ($state) {
                                     if (!$get('account.name')) {
@@ -156,7 +160,8 @@ class DataSiswaResource extends Resource
                         DatePicker::make('tanggal_lahir')
                             ->label('Tanggal Lahir')
                             ->required()
-                            ->native(false),
+                            ->format('Y-m-d')
+                            ->displayFormat('Y-m-d'),
                         
                         Select::make('agama')
                             ->label('Agama')
@@ -209,7 +214,8 @@ class DataSiswaResource extends Resource
                         TextInput::make('no_telp_ortu_wali')
                             ->label('No. Telp Orang Tua/Wali')
                             ->tel()
-                            ->required(),
+                            ->nullable()
+                            ->helperText('Opsional - kosongkan jika tidak ada'),
                         
                         TextInput::make('email_ortu_wali')
                             ->label('Email Orang Tua/Wali')
@@ -255,7 +261,7 @@ class DataSiswaResource extends Resource
                                             : '';
                                         
                                         return [
-                                            $kelas->id => $kelas->nama_kelas . ' [Tingkat ' . $kelas->tingkat . ']' . $waliKelas . $tahun
+                                            $kelas->kelas_id => $kelas->nama_kelas . ' [Tingkat ' . $kelas->tingkat . ']' . $waliKelas . $tahun
                                         ];
                                     });
                             })
@@ -389,7 +395,7 @@ class DataSiswaResource extends Resource
                                                 ? ' - ' . $kelas->walikelas->nama_lengkap 
                                                 : '';
                                             return [
-                                                $kelas->id => $kelas->nama_kelas . ' [Tingkat ' . $kelas->tingkat . ']' . $waliKelas
+                                                $kelas->kelas_id => $kelas->nama_kelas . ' [Tingkat ' . $kelas->tingkat . ']' . $waliKelas
                                             ];
                                         });
                                 })
@@ -402,13 +408,36 @@ class DataSiswaResource extends Resource
                         ->deselectRecordsAfterCompletion()
                         ->successNotificationTitle('Siswa berhasil dipindahkan ke kelas baru'),
 
-                        //aktif non aktif
-                        BulkAction::make('aktifkan')
-                        ->label('Aktifkan')
-                        ->icon('heroicon-o-check-circle')
-                        ->color('success')
-                        ->action(fn ($records) => $records->each->update(['status' => 'Aktif']))
-                        ->deselectRecordsAfterCompletion(),
+                        //toggle status
+                        BulkAction::make('toggleStatus')
+                        ->label('Ubah Status')
+                        ->icon('heroicon-o-arrow-path')
+                        ->color('warning')
+                        ->form([
+                            Select::make('status')
+                                ->label('Status Baru')
+                                ->options([
+                                    'Aktif' => 'Aktif',
+                                    'Non_Aktif' => 'Non Aktif',
+                                ])
+                                ->required()
+                        ])
+                        ->action(function (array $data, $records) {
+                            $updated = 0;
+                            foreach ($records as $record) {
+                                $record->status = $data['status'];
+                                $record->save();
+                                $updated++;
+                            }
+                            
+                            Notification::make()
+                                ->success()
+                                ->title('Status berhasil diubah')
+                                ->body("{$updated} siswa berhasil di-update ke status: {$data['status']}")
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion()
+                        ->requiresConfirmation(),
                 ]),
             ])
             ->defaultSort('created_at', 'desc');
@@ -432,6 +461,8 @@ class DataSiswaResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return auth()->user()->can('view data admin');
+        // Only admin can access this resource
+        $user = auth()->user();
+        return $user && $user->hasRole('admin');
     }
 }

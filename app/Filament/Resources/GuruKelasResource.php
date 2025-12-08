@@ -33,7 +33,7 @@ class GuruKelasResource extends Resource
         }
         
         return parent::getEloquentQuery()
-            ->where('walikelas_id', $guru->id)
+            ->where('walikelas_id', $guru->guru_id) // Gunakan guru_id, bukan id
             ->with(['walikelas', 'tahunAjaran']);
     }
 

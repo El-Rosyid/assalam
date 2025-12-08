@@ -26,7 +26,7 @@
     </div>
 
     {{-- Assessment Results Table --}}
-    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div class="bg-gray-50 px-6 py-3 border-b border-gray-200">
             <h4 class="text-lg font-semibold text-gray-900">Hasil Penilaian per Kriteria</h4>
         </div>

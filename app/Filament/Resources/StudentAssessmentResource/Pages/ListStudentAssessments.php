@@ -16,6 +16,15 @@ class ListStudentAssessments extends ListRecords
 {
     protected static string $resource = StudentAssessmentResource::class;
 
+    /**
+     * Override getTableRecordKey for grouped records
+     * Since we're grouping by semester, use semester as the key
+     */
+    public function getTableRecordKey($record): string
+    {
+        return (string) ($record->semester ?? 'unknown');
+    }
+
     protected function getHeaderActions(): array
     {
         return [
@@ -24,58 +33,50 @@ class ListStudentAssessments extends ListRecords
                 ->icon('heroicon-o-plus-circle')
                 ->color('success')
                 ->form([
-                    Select::make('academic_year_id')
-                        ->label('Tahun Ajaran')
-                        ->options(function () {
-                            return academic_year::orderBy('year', 'desc')
-                                ->get()
-                                ->mapWithKeys(function ($academicYear) {
-                                    return [$academicYear->id => $academicYear->nama_tahun_ajaran];
-                                })
-                                ->toArray();
-                        })
+                    Select::make('semester')
+                        ->label('Semester')
+                        ->options([
+                            'Ganjil' => 'Semester 1 (Ganjil)',
+                            'Genap' => 'Semester 2 (Genap)',
+                        ])
                         ->default(function () {
-                            return academic_year::orderBy('year', 'desc')->first()?->id;
+                            $currentMonth = now()->month;
+                            return ($currentMonth >= 7 && $currentMonth <= 12) ? 'Ganjil' : 'Genap';
                         })
-                        ->required()
-                        ->searchable(),
-                                        
+                        ->required(),
                 ])
                 ->action(function (array $data) {
-                    $this->generateAssessmentsForCurrentSemester($data['academic_year_id']);
+                    $this->generateAssessmentsForSemester($data['semester']);
                 })
                 ->modalHeading('Generate Penilaian Semester')
-                ->modalDescription('Pilih tahun ajaran untuk membuat penilaian bagi semua siswa di kelas Anda')
+                ->modalDescription('Pilih semester untuk membuat penilaian bagi semua siswa di kelas Anda')
                 ->modalSubmitActionLabel('Generate Penilaian')
                 ->modalWidth('md'),
         ];
     }
     
-    protected function generateAssessmentsForCurrentSemester($academicYearId)
+    protected function generateAssessmentsForSemester($semester)
     {
         $user = auth()->user();
         if (!$user || !$user->guru) {
             return;
         }
         
-        // Get selected academic year
-        $academicYear = academic_year::find($academicYearId);
-        if (!$academicYear) {
+        // Get kelas IDs for this wali kelas
+        $kelasIds = \App\Models\data_kelas::where('walikelas_id', $user->guru->guru_id)
+            ->pluck('kelas_id')
+            ->toArray();
+        
+        if (empty($kelasIds)) {
             Notification::make()
-                ->title('Tahun ajaran tidak ditemukan')
-                ->danger()
+                ->title('Tidak ada kelas yang Anda ampu')
+                ->warning()
                 ->send();
             return;
         }
         
-        // Determine current semester based on current month
-        $currentMonth = now()->month;
-        $semester = ($currentMonth >= 7 && $currentMonth <= 12) ? 'Ganjil' : 'Genap';
-        
-        // Get students in classes where user is wali kelas
-        $siswaList = data_siswa::whereHas('kelas', function ($query) use ($user) {
-            $query->where('walikelas_id', $user->guru->id);
-        })->get();
+        // Get students in these classes
+        $siswaList = data_siswa::whereIn('kelas', $kelasIds)->get();
         
         if ($siswaList->isEmpty()) {
             Notification::make()
@@ -88,17 +89,17 @@ class ListStudentAssessments extends ListRecords
         $created = 0;
         foreach ($siswaList as $siswa) {
             $existing = student_assessment::where([
-                'data_siswa_id' => $siswa->id,
-                'academic_year_id' => $academicYearId,
+                'siswa_nis' => $siswa->nis,
                 'semester' => $semester
             ])->first();
             
             if (!$existing) {
+                // Get tahun_ajaran_id from siswa's kelas
+                $tahunAjaranId = $siswa->kelasInfo?->tahun_ajaran_id;
+                
                 student_assessment::create([
-                    'data_siswa_id' => $siswa->id,
-                    'data_guru_id' => $user->guru->id,
-                    'data_kelas_id' => $siswa->kelas,  // kelas field in data_siswa
-                    'academic_year_id' => $academicYearId,
+                    'siswa_nis' => $siswa->nis,
+                    'tahun_ajaran_id' => $tahunAjaranId,
                     'semester' => $semester,
                     'status' => 'belum_dinilai'
                 ]);
@@ -108,12 +109,12 @@ class ListStudentAssessments extends ListRecords
         
         if ($created > 0) {
             Notification::make()
-                ->title("Berhasil membuat {$created} penilaian baru untuk {$academicYear->nama_tahun_ajaran} - Semester {$semester}")
+                ->title("Berhasil membuat {$created} penilaian baru untuk Semester {$semester}")
                 ->success()
                 ->send();
         } else {
             Notification::make()
-                ->title("Semua penilaian untuk {$academicYear->nama_tahun_ajaran} - Semester {$semester} sudah ada")
+                ->title("Semua penilaian untuk Semester {$semester} sudah ada")
                 ->info()
                 ->send();
         }
@@ -121,15 +122,7 @@ class ListStudentAssessments extends ListRecords
     
     protected function getTableQuery(): Builder
     {
-        // Override query to show only current user's students
-        $user = auth()->user();
-        if (!$user || !$user->guru) {
-            return parent::getTableQuery()->whereRaw('1 = 0'); // Return empty result
-        }
-        
-        return parent::getTableQuery()
-            ->whereHas('kelas', function ($query) use ($user) {
-                $query->where('walikelas_id', $user->guru->id);
-            });
+        // Query sudah dihandle di Resource level
+        return parent::getTableQuery();
     }
 }

@@ -1,21 +1,46 @@
 <?php
+// routes/web.php
 
 use Illuminate\Support\Facades\Route;
-
-/*
-|--------------------------------------------------------------------------
-| Web Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register web routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "web" middleware group. Make something great!
-|
-*/
+use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\RaportController;
 
 Route::get('/', function () {
-    return view('welcome');
+    $sekolah = App\Models\Sekolah::first();
+    return view('custom.login', compact('sekolah'));
 });
+
+// GET /login - redirect to home with login form
+Route::get('/login', function () {
+    $sekolah = App\Models\Sekolah::first();
+    return view('custom.login', compact('sekolah'));
+})->name('login')->middleware('guest');
+
+// Handle custom login
+Route::post('/login', function (Illuminate\Http\Request $request) {
+    $credentials = $request->validate([
+        'username' => 'required|string',
+        'password' => 'required|string',
+    ]);
+
+    if (Auth::attempt($credentials, $request->boolean('remember'))) {
+        $request->session()->regenerate();
+        return redirect()->intended('/admin');
+    }
+
+    return back()->withErrors([
+        'username' => 'Username atau password salah.',
+    ])->withInput($request->only('username'));
+})->name('custom.login')->middleware('guest');
+
+// Handle logout
+Route::post('/logout', function (Illuminate\Http\Request $request) {
+    Auth::logout();
+    $request->session()->invalidate();
+    $request->session()->regenerateToken();
+    return redirect('/');
+})->name('logout');
+
 Route::get('/about', function () {
     return view('about');
 });
@@ -31,10 +56,6 @@ Route::get('/profile', function () {
 Route::get('/sekolah', function () {
     return view('sekolah');
 });
-
-Route::get('/siswa', function () {
-    return view('siswa');
-});
 Route::get('/guru', function () {
     return view('guru');
 });
@@ -44,12 +65,9 @@ Route::get('/kelas', function () {
 
 // Report Card Routes
 Route::middleware('auth')->group(function () {
-    Route::get('/download/raport/{siswa}', [App\Http\Controllers\ReportCardController::class, 'downloadRaport'])
-        ->name('download.raport');
-    Route::get('/preview/raport/{siswa}', [App\Http\Controllers\ReportCardController::class, 'previewRaport'])
-        ->name('preview.raport');
-    Route::get('/print/raport/{siswa}', [App\Http\Controllers\ReportCardController::class, 'printRaport'])
-        ->name('print.raport');
+    // Route untuk melihat PDF inline di browser (seperti website jurnal)
+    Route::get('/view-raport/{siswa}', [RaportController::class, 'viewPDFInline'])
+        ->name('view.raport.inline');
+    
+    // (routes for raport display remain above)
 });
-
-

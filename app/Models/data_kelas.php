@@ -10,8 +10,10 @@ class data_kelas extends Model
     use HasFactory;
 
     protected $table = 'data_kelas';
-
-    protected $guarded = []; // Otomatis semua field boleh mass-assign
+    protected $primaryKey = 'kelas_id';
+    
+    // Disable timestamps if not using timestamps in migration
+    public $timestamps = false;
     
     protected $fillable = [
         'nama_kelas',
@@ -26,13 +28,10 @@ class data_kelas extends Model
         'tahun_ajaran_id' => 'integer'
     ];
 
-    // Disable timestamps if not using timestamps in migration
-    public $timestamps = false;
-
     // Relationships
     public function walikelas()
     {
-        return $this->belongsTo(data_guru::class, 'walikelas_id');
+        return $this->belongsTo(data_guru::class, 'walikelas_id', 'guru_id'); // Pastikan menggunakan guru_id
     }
 
     public function tahunAjaran()
@@ -42,11 +41,23 @@ class data_kelas extends Model
 
     public function siswa()
     {
-        return $this->hasMany(data_siswa::class, 'kelas', 'id');
+        return $this->hasMany(data_siswa::class, 'kelas', 'kelas_id');
     }
 
     public function getJumlahSiswaAttribute()
     {
         return $this->siswa()->count();
+    }
+
+    /**
+     * Accessor untuk nama_kelas - otomatis berdasarkan tingkat
+     */
+    public function getNamaKelasAttribute($value)
+    {
+        // Jika nama_kelas kosong atau tidak sesuai, generate dari tingkat
+        if (empty($value) || !in_array($value, ['Kelas A', 'Kelas B'])) {
+            return $this->tingkat == 1 ? 'Kelas A' : ($this->tingkat == 2 ? 'Kelas B' : $value);
+        }
+        return $value;
     }
 }

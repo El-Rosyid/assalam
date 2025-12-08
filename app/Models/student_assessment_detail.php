@@ -4,16 +4,19 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 
 class student_assessment_detail extends Model
 {
     use HasFactory;
     
     protected $table = 'student_assessment_details';
+    protected $primaryKey = 'detail_id';
     
     protected $fillable = [
-        'student_assessment_id',
-        'assessment_variable_id',
+        'penilaian_id',
+        'variabel_id',
         'rating',
         'description',
         'images'
@@ -22,6 +25,33 @@ class student_assessment_detail extends Model
     protected $casts = [
         'images' => 'array',
     ];
+    
+    /**
+     * Boot the model
+     */
+    protected static function boot()
+    {
+        parent::boot();
+        
+        // When deleting (permanent delete)
+        static::deleting(function ($detail) {
+            // Delete all images
+            if (!empty($detail->images) && is_array($detail->images)) {
+                foreach ($detail->images as $imagePath) {
+                    $path = str_replace(['storage/', '/storage/'], '', $imagePath);
+                    if (Storage::disk('public')->exists($path)) {
+                        Storage::disk('public')->delete($path);
+                        Log::info("Deleted detail image: {$path}");
+                    }
+                }
+            }
+            
+            Log::info("StudentAssessmentDetail deleted", [
+                'id' => $detail->detail_id,
+                'penilaian_id' => $detail->penilaian_id
+            ]);
+        });
+    }
     
     // Rating options
     public static function getRatingOptions()
@@ -34,9 +64,18 @@ class student_assessment_detail extends Model
         ];
     }
     
-    // Auto descriptions based on rating
-    public static function getAutoDescription($rating)
+    // Auto descriptions based on rating - now dynamic from database
+    public static function getAutoDescription($rating, $assessmentVariableId = null)
     {
+        // Jika ada assessment_variable_id, ambil dari database
+        if ($assessmentVariableId) {
+            $description = AssessmentRatingDescription::getDescriptionFor($assessmentVariableId, $rating);
+            if ($description) {
+                return $description;
+            }
+        }
+        
+        // Fallback ke hardcode (backward compatibility)
         return match($rating) {
             'Berkembang Sesuai Harapan' => 'Anak menunjukkan perkembangan yang sesuai dengan harapan dan standar yang ditetapkan.',
             'Belum Berkembang' => 'Anak belum menunjukkan perkembangan pada aspek ini dan memerlukan bimbingan lebih intensif.',
@@ -49,12 +88,12 @@ class student_assessment_detail extends Model
     // Relationships
     public function studentAssessment()
     {
-        return $this->belongsTo(student_assessment::class);
+        return $this->belongsTo(student_assessment::class, 'penilaian_id', 'penilaian_id');
     }
     
     public function assessmentVariable()
     {
-        return $this->belongsTo(assessment_variable::class);
+        return $this->belongsTo(assessment_variable::class, 'variabel_id', 'id');
     }
     
     // Mutators
@@ -64,7 +103,8 @@ class student_assessment_detail extends Model
         
         // Auto-fill description if empty
         if (empty($this->attributes['description']) && $value) {
-            $this->attributes['description'] = self::getAutoDescription($value);
+            $assessmentVariableId = $this->attributes['variabel_id'] ?? null;
+            $this->attributes['description'] = self::getAutoDescription($value, $assessmentVariableId);
         }
     }
 }
