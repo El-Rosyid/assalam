@@ -71,7 +71,7 @@ class student_assessment extends Model
     
     public function details()
     {
-        return $this->hasMany(student_assessment_detail::class, 'student_assessment_id', 'penilaian_id');
+        return $this->hasMany(student_assessment_detail::class, 'penilaian_id', 'penilaian_id');
     }
     
     // Helper methods

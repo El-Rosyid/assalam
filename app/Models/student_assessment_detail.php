@@ -15,8 +15,8 @@ class student_assessment_detail extends Model
     protected $primaryKey = 'detail_id';
     
     protected $fillable = [
-        'student_assessment_id',
-        'assessment_variable_id',
+        'penilaian_id',
+        'variabel_id',
         'rating',
         'description',
         'images'
@@ -48,7 +48,7 @@ class student_assessment_detail extends Model
             
             Log::info("StudentAssessmentDetail deleted", [
                 'id' => $detail->detail_id,
-                'student_assessment_id' => $detail->student_assessment_id
+                'penilaian_id' => $detail->penilaian_id
             ]);
         });
     }
@@ -88,22 +88,20 @@ class student_assessment_detail extends Model
     // Relationships
     public function studentAssessment()
     {
-        return $this->belongsTo(student_assessment::class, 'student_assessment_id', 'penilaian_id');
+        return $this->belongsTo(student_assessment::class, 'penilaian_id', 'penilaian_id');
     }
-    
+
     public function assessmentVariable()
     {
-        return $this->belongsTo(assessment_variable::class, 'assessment_variable_id', 'id');
-    }
-    
-    // Mutators
+        return $this->belongsTo(assessment_variable::class, 'variabel_id', 'id');
+    }    // Mutators
     public function setRatingAttribute($value)
     {
         $this->attributes['rating'] = $value;
         
-        // Auto-fill description if empty
+        // Auto-populate description jika masih kosong
         if (empty($this->attributes['description']) && $value) {
-            $assessmentVariableId = $this->attributes['assessment_variable_id'] ?? null;
+            $assessmentVariableId = $this->attributes['variabel_id'] ?? null;
             $this->attributes['description'] = self::getAutoDescription($value, $assessmentVariableId);
         }
     }
