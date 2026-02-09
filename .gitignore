@@ -17,3 +17,44 @@ yarn-error.log
 /.fleet
 /.idea
 /.vscode
+
+# Database dumps & SQL files (NEVER commit!)
+*.sql
+!database/migrations/*.sql
+!database/schema/mysql-schema.sql
+
+# Test & Debug files
+test-*.php
+check-*.php
+diagnose.php
+clear-cache.php
+create-session-table.php
+fix-*.php
+rollback-*.php
+/public/test-*.php
+
+# Deployment scripts (environment specific)
+deploy.sh
+deploy-*.sh
+supervisor-queue.conf
+*.conf
+
+# Temporary documentation
+CARA-*.md
+DEPLOYMENT-*.md
+FIX-*.md
+PRE-DEPLOYMENT-*.md
+PRODUCTION-*.md
+QUICK-*.md
+TEST-*.md
+TROUBLESHOOT-*.md
+UPLOAD-*.md
+
+# Archives & backups
+*.zip
+*.tar.gz
+*.rar
+*backup*.sql
+
+# Cron job configs (server specific)
+/cron job/
